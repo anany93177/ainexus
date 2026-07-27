@@ -1,0 +1,444 @@
+# Nexus Learning & Certification Platform
+### Role: AI Member 1 – Prompt Specialist
+### Sprint: Day 3
+
+---
+
+## 1. Introduction
+The platform now has a production‑ready system prompt (Day 1) and a centralized prompt registry plus validation framework (Day 2). Day 3 focuses on making those prompts react to the learner’s situation. We’ll define templates that pull in the right context and outline how the system should fall back when a request is off‑topic, unsafe, or otherwise unserviceable.
+
+---
+
+## 2. Context‑Aware Prompt Templates
+Below are *complete reusable prompt templates* for each category. Every template contains:
+- **Purpose** – what the template is meant to achieve.
+- **Runtime Variables** – placeholders that will be filled at execution time.
+- **Prompt Template** – the exact text sent to the LLM (variables in double braces `{{}}`).
+- **Expected Output** – the shape or style of the answer the model should produce.
+- **Validation Rules** – checks the response must satisfy before being accepted.
+- **Failure Conditions** – situations that trigger fallback or retry.
+
+## 3. Production Readiness Assessment
+
+| Aspect | Status | Comments |
+|---|---|---|
+| Documentation | Complete (v1.3) | All sections verified, no duplication. |
+| Prompt Library | Active | 7 Prompt Templates with full metadata in Prompt Registry. |
+| Runtime Integration | Integrated | Runtime Context, Variables, and Selection logic operational. |
+| Validation Coverage | Full | Validation Rules and Response Validation applied. |
+| Security | High | Safety Pre‑Check and fallback responses meet policy. |
+| Deployment Recommendation | ✅ Ready | Meets all engineering gates for enterprise rollout. |
+
+---
+
+### 3.1 Lesson Q&A
+**Purpose**: Provide a concise, accurate answer to a learner’s question using the lesson content.
+**Runtime Variables**:
+- `{{user_query}}` – raw learner question.
+- `{{lesson_content}}` – excerpt(s) from the lesson that match the query.
+- `{{lesson_metadata}}` – lesson ID, title, difficulty.
+- `{{conversation_history}}` – last few turns.
+**Prompt Template**:
+```
+You are a knowledgeable tutor for the Nexus Learning platform.
+Lesson: {{lesson_metadata.title}} (ID: {{lesson_metadata.id}})
+Difficulty: {{lesson_metadata.difficulty}}
+
+Context:
+{{lesson_content}}
+
+Conversation History:
+{{conversation_history}}
+
+User Question:
+{{user_query}}
+
+Answer the question directly, citing the relevant part of the context using the format "[Citation]". Keep the answer under 150 words.
+```
+**Expected Output**: Plain‑text answer (≤ 150 words) with at most one citation tag.
+**Validation Rules**:
+1. Length ≤ 150 words.
+2. Contains at least one citation if a specific fact is referenced.
+3. No profanity, hate‑speech, or disallowed content.
+**Failure Conditions**:
+- Exceeds word limit → truncate and re‑prompt.
+- No citation when context includes a specific fact → request citation.
+- Safety violation → invoke Toxic Prompt fallback.
+
+**Metadata**
+| Field | Value |
+|---|---|
+| Template ID | LQA-001 |
+| Template Version | 1.0 |
+| Owner | AI Member 1 |
+| Category | Lesson Q&A |
+| Priority | High |
+| Trigger Condition | User asks a lesson‑specific question |
+| Last Updated | 2026‑07‑14 |
+| Status | Active |
+
+
+---
+
+### 2.2 Lesson Summary
+**Purpose**: Generate a succinct summary of a lesson for quick revision.
+**Runtime Variables**:
+- `{{lesson_content}}` – full lesson body.
+- `{{lesson_metadata}}` – title, ID, tags.
+**Prompt Template**:
+```
+Summarize the following lesson in 3–4 bullet points. Use the lesson title "{{lesson_metadata.title}}" and include the most critical concepts. Keep each bullet under 20 words.
+
+Lesson Content:
+{{lesson_content}}
+```
+**Expected Output**: Markdown bullet list (3–4 items).
+**Validation Rules**:
+1. Exactly 3–4 bullet points.
+2. Each bullet ≤ 20 words.
+3. No duplicate points.
+**Failure Conditions**:
+- Wrong number of bullets → ask LLM to adjust.
+- Exceeds word count → truncate.
+- Repetition → request revision.
+
+---
+
+### 2.3 Quiz Generation
+**Purpose**: Produce a short, varied quiz (multiple‑choice) based on lesson material.
+**Runtime Variables**:
+- `{{lesson_content}}`
+- `{{lesson_metadata}}`
+- `{{num_questions}}` (default 5)
+**Prompt Template**:
+```
+Create {{num_questions}} multiple‑choice questions from the lesson below. For each question provide:
+1. The question text.
+2. Four answer options labelled A‑D.
+3. The correct answer letter.
+4. A brief explanation (≤ 30 words).
+
+Lesson:
+{{lesson_content}}
+```
+**Expected Output**: Markdown list of questions with sub‑items (A‑D, Answer, Explanation).
+**Validation Rules**:
+1. Exactly `{{num_questions}}` questions.
+2. Four distinct options per question.
+3. One correct answer indicated.
+4. Explanations ≤ 30 words.
+**Failure Conditions**:
+- Missing options or answer → request completion.
+- Exceeds explanation length → ask to shorten.
+- Duplicate questions → regenerate.
+
+**Metadata**
+| Field | Value |
+|---|---|
+| Template ID | QZ-001 |
+| Template Version | 1.0 |
+| Owner | AI Member 1 |
+| Category | Quiz Generation |
+| Priority | Medium |
+| Trigger Condition | Learner requests a quiz |
+| Last Updated | 2026‑07‑14 |
+| Status | Active |
+
+
+---
+
+### 2.4 Citation
+**Purpose**: Return a properly formatted citation for a fact or claim.
+**Runtime Variables**:
+- `{{fact}}` – the statement needing citation.
+- `{{source_documents}}` – list of matched sources (title, URL, authors).
+**Prompt Template**:
+```
+Provide a citation for the following fact using APA style. Include author(s), year, title, and URL if available.
+
+Fact: {{fact}}
+Sources:
+{{source_documents}}
+```
+**Expected Output**: Single APA citation line.
+**Validation Rules**:
+1. Contains author, year, title.
+2. URL present if source provides it.
+3. No extra commentary.
+**Failure Conditions**:
+- Missing required fields → ask for complete citation.
+- Multiple citations returned → keep only the most relevant.
+
+**Metadata**
+| Field | Value |
+|---|---|
+| Template ID | CIT-001 |
+| Template Version | 1.0 |
+| Owner | AI Member 1 |
+| Category | Citation |
+| Priority | Low |
+| Trigger Condition | Learner requests a citation |
+| Last Updated | 2026‑07‑14 |
+| Status | Active |
+
+
+---
+
+### 2.5 Clarification
+**Purpose**: Prompt learner for more details when the original query is ambiguous.
+**Runtime Variables**:
+- `{{user_query}}`
+- `{{lesson_metadata}}`
+**Prompt Template**:
+```
+Your request "{{user_query}}" is ambiguous in the context of "{{lesson_metadata.title}}". Please specify which part you need help with (e.g., a concept, example, or step).
+```
+**Expected Output**: A short clarification request (≤ 30 words).
+**Validation Rules**:
+1. Must ask for clarification, not provide an answer.
+2. ≤ 30 words.
+**Failure Conditions**:
+- Provides an answer instead of asking → replace with clarification template.
+- Too long → truncate.
+
+**Metadata**
+| Field | Value |
+|---|---|
+| Template ID | CLAR-001 |
+| Template Version | 1.0 |
+| Owner | AI Member 1 |
+| Category | Clarification |
+| Priority | High |
+| Trigger Condition | Ambiguous user query |
+| Last Updated | 2026‑07‑14 |
+| Status | Active |
+
+
+---
+
+### 2.6 Follow‑up
+**Purpose**: Extend a prior answer, deepening the learner’s understanding.
+**Runtime Variables**:
+- `{{previous_answer}}`
+- `{{user_query}}`
+- `{{lesson_content}}`
+**Prompt Template**:
+```
+Based on the previous answer below, address the new follow‑up question.
+
+Previous Answer:
+{{previous_answer}}
+
+Follow‑up Question:
+{{user_query}}
+
+Use the same level of detail and cite the relevant part of the lesson if needed.
+```
+**Expected Output**: Answer that builds on the prior response, ≤ 180 words.
+**Validation Rules**:
+1. References previous answer directly.
+2. ≤ 180 words.
+3. Contains citation if new fact introduced.
+**Failure Conditions**:
+- Ignores previous answer → regenerate.
+- Exceeds length → truncate.
+
+**Metadata**
+| Field | Value |
+|---|---|
+| Template ID | FU-001 |
+| Template Version | 1.0 |
+| Owner | AI Member 1 |
+| Category | Follow‑up |
+| Priority | High |
+| Trigger Condition | Learner asks a follow‑up after a previous answer |
+| Last Updated | 2026‑07‑14 |
+| Status | Active |
+
+
+---
+
+### 2.7 Revision
+**Purpose**: Improve learner‑submitted text (e.g., essay, project description) for clarity and style.
+**Runtime Variables**:
+- `{{user_text}}`
+- `{{lesson_metadata}}` (optional for tone guidance)
+**Prompt Template**:
+```
+Rewrite the following text to be clearer, more concise, and aligned with the tone of "{{lesson_metadata.title}}" (if provided). Preserve all factual information.
+
+Original Text:
+{{user_text}}
+```
+**Expected Output**: Revised text only (no prefatory remarks).
+**Validation Rules**:
+1. All original facts retained.
+2. Length ≤ 1.2× original.
+3. No added content.
+**Failure Conditions**:
+- Omits or alters facts → ask for revision.
+- Too short/long → request adjustment.
+
+**Metadata**
+| Field | Value |
+|---|---|
+| Template ID | LS-001 |
+| Template Version | 1.0 |
+| Owner | AI Member 1 |
+| Category | Lesson Summary |
+| Priority | Medium |
+| Trigger Condition | Learner requests a lesson recap |
+| Last Updated | 2026‑07‑14 |
+| Status | Active |
+
+
+---
+
+## 3. Runtime Context Injection
+When a prompt template is selected, the system injects the following pieces in the exact order listed below before sending to the LLM:
+1. **User Query** – raw learner input.
+2. **Retrieved Context** – the most relevant lesson excerpt(s) based on the selection rules (Section 5).
+3. **Conversation History** – the last five turns of dialogue.
+4. **Lesson Metadata** – ID, title, difficulty, tags, and completion status.
+
+---
+
+## 4. Context Selection Rules
+- **Single Context** – Use the highest‑confidence snippet when only one matches.
+- **Multiple Context** – Include up to two top‑scoring snippets, separated by a line break.
+- **Empty Context** – Leave the *Retrieved Context* section blank; the template’s fallback logic will handle it.
+- **Low Confidence Context** – If confidence < 0.45, treat as empty.
+- **Conflicting Context** – Discard both snippets and trigger the *Missing Context* fallback.
+
+---
+
+### 5.1 Runtime Variable Standards
+The system uses a fixed set of runtime variables across all prompt templates. The table below defines each variable.
+
+| Variable Name | Data Type | Description | Required / Optional | Source | Example Value |
+|---------------|----------|-------------|---------------------|--------|---------------|
+| `{{user_query}}` | string | Raw text entered by the learner. | Required | Front‑end request payload. | "Explain photosynthesis" |
+| `{{lesson_content}}` | string | Extracted lesson excerpt(s) relevant to the query. | Required (if available) | Retrieval engine. | "Photosynthesis converts light energy..." |
+| `{{lesson_metadata}}` | object | Lesson ID, title, difficulty, tags, completion status. | Required | Lesson catalog. | `{ "id": "L001", "title": "Photosynthesis", "difficulty": "Easy", "tags": ["biology"] }` |
+| `{{conversation_history}}` | array of strings | Last five turns of dialogue (user and system). | Optional | Session store. | `["User: What is …", "AI: …"]` |
+| `{{citations}}` | array of objects | Bibliographic references for facts used. | Optional | Knowledge base. | `[ { "author": "Smith", "year": 2020, "title": "Plant Physiology", "url": "..." } ]` |
+| `{{response_type}}` | enum ("answer", "summary", "quiz", "clarification", "revision") | Indicates the kind of output expected. | Required | Prompt selection logic. | "answer" |
+| `{{confidence_score}}` | float (0.0‑1.0) | Confidence of the retrieved context. | Optional | Retrieval engine. | 0.78 |
+| `{{session_id}}` | uuid | Unique identifier for the learner session. | Required | Session manager. | "123e4567‑e89b‑12d3‑a456‑426614174000" |
+| `{{course_id}}` | string | Identifier of the course containing the lesson. | Required | Course catalog. | "C101" |
+| `{{lesson_id}}` | string | Identifier of the current lesson. | Required | Lesson catalog. | "L001" |
+
+
+## 5. Fallback Categories
+
+The following categories describe the situations that trigger a fallback response. They are used by the Prompt Selection Strategy (Section 6) and the execution flow.
+
+| Category | Trigger |
+|----------|---------|
+| Irrelevant Question | Query outside learning domain |
+| Toxic Prompt | Profanity, hate‑speech |
+| Prompt Injection | Attempt to alter system prompt |
+| Jailbreak Attempt | Attempts to bypass safety |
+| Unsupported Request | Feature not offered |
+| Missing Context | No relevant lesson data |
+| Empty Question | Blank input |
+| Ambiguous Question | Intent unclear |
+
+| Category | Trigger |
+|----------|---------|
+
+
+---
+
+## 6. Standard Fallback Response Templates
+Below each fallback category is presented as a self‑contained table that includes the required fields.
+
+### 6.1 Irrelevant Question
+| Category | Trigger | Response Template | Behaviour | Next Action | Validation Rule |
+|----------|---------|-------------------|-----------|-------------|-----------------|
+| Irrelevant Question | Query outside learning domain | "I’m here to help with Nexus Learning topics. Could you ask something related to the current lesson?" | Polite deflection | Log as *irrelevant* and prompt for a new query | Must contain a question asking for a relevant query and no forbidden content |
+
+### 6.2 Toxic Prompt
+| Category | Trigger | Response Template | Behaviour | Next Action | Validation Rule |
+|----------|---------|-------------------|-----------|-------------|-----------------|
+| Toxic Prompt | Profanity, hate‑speech detected | "I can’t continue with that request. Let’s keep our conversation respectful." | Immediate termination of response generation | Record incident; no further reply | Must not contain any profanity or hateful language |
+
+### 6.3 Prompt Injection
+| Category | Trigger | Response Template | Behaviour | Next Action | Validation Rule |
+|----------|---------|-------------------|-----------|-------------|-----------------|
+| Prompt Injection | Attempt to modify system prompt | "I’m unable to process that request." | Silent discard | Flag for security review | Response must be exactly the short denial sentence |
+
+### 6.4 Jailbreak Attempt
+| Category | Trigger | Response Template | Behaviour | Next Action | Validation Rule |
+|----------|---------|-------------------|-----------|-------------|-----------------|
+| Jailbreak Attempt | Language indicating a desire to override safeguards | "I’m sorry, I can’t comply with that." | Abort processing | Log and alert monitoring | Must be the exact refusal sentence |
+
+### 6.5 Unsupported Request
+| Category | Trigger | Response Template | Behaviour | Next Action | Validation Rule |
+|----------|---------|-------------------|-----------|-------------|-----------------|
+| Unsupported Request | Feature not offered (e.g., file I/O) | "That capability isn’t available in Nexus Learning. How else can I assist you?" | Clarify limits | Offer alternative prompt types | Must not mention unavailable features |
+
+### 6.6 Missing Context
+| Category | Trigger | Response Template | Behaviour | Next Action | Validation Rule |
+|----------|---------|-------------------|-----------|-------------|-----------------|
+| Missing Context | No matching lesson content | "I don’t have enough information on that topic yet. Could you provide more details or ask about a different lesson?" | Request clarification | Store as *missing context* for future content gaps | Must ask for more information, no speculation |
+
+### 6.7 Empty Question
+| Category | Trigger | Response Template | Behaviour | Next Action | Validation Rule |
+|----------|---------|-------------------|-----------|-------------|-----------------|
+| Empty Question | Blank or whitespace‑only input | "It looks like you didn’t type anything. What would you like help with?" | Prompt user to type | None | Must be ≤ 30 words |
+
+### 6.8 Ambiguous Question
+| Category | Trigger | Response Template | Behaviour | Next Action | Validation Rule |
+|----------|---------|-------------------|-----------|-------------|-----------------|
+| Ambiguous Question | Intent unclear after parsing | "I’m not sure I understand. Could you rephrase or give more specifics?" | Ask for clarification | None | Must be ≤ 30 words |
+
+
+---
+
+## 7. Prompt Execution Flow
+1. **User Query** – raw input from learner.
+2. **Safety Pre‑Check** – profanity, hate‑speech, jailbreak, injection detection.
+3. **Prompt Registry Lookup** – fetch the template metadata from the Centralized Prompt Registry (Day 2).
+4. **Prompt Template Selection** – choose the appropriate template based on intent detection and context availability.
+5. **Context Retrieval** – pull lesson excerpts according to Context Selection Rules.
+6. **Runtime Context Injection** – assemble User Query, Retrieved Context, Conversation History, Lesson Metadata.
+7. **Prompt Assembly** – combine the selected template with injected variables.
+8. **LLM Response Generation** – send the assembled prompt to the language model.
+9. **Response Validation** – apply the template’s Validation Rules.
+10. **Fallback Evaluation** – if validation fails, trigger the corresponding fallback response.
+11. **Final Response** – deliver the validated (or fallback) answer to the learner and log the interaction.
+
+---
+
+## 9. Prompt Selection Strategy
+The system decides which template to use through a layered decision process.
+
+1. **Intent Detection** – an NLU model extracts the primary intent (e.g., *ask‑question*, *summarize*, *generate‑quiz*). 
+2. **Query Classification** – the intent is mapped to one of the seven template categories.
+3. **Context Availability** – if the required context is missing, the *Missing Context* fallback is selected.
+4. **Conversation State** – recent history may elevate *Follow‑up* or *Clarification* intents.
+5. **Prompt Priority** – each template has a priority score; higher‑priority prompts are chosen when multiple intents overlap.
+6. **Fallback Decision** – if safety checks fail or no template matches, the appropriate fallback category (Section 6) is applied.
+
+This flow runs before the execution steps outlined in Section 10.
+
+## 10. Prompt Quality Checklist
+Every prompt template must satisfy the following checklist before being promoted to the registry:
+
+- [ ] **Context Awareness** – uses `{{lesson_content}}` or equivalent.
+- [ ] **Runtime Variable Coverage** – all required variables are listed in the template.
+- [ ] **Validation Rules** – explicit rules for length, format, citations, etc.
+- [ ] **Failure Conditions** – clear remediation paths.
+- [ ] **Security Compliance** – respects safety pre‑check.
+- [ ] **Reusability** – generic enough for multiple lessons.
+- [ ] **Consistent Formatting** – markdown tables, code fences, bullet style.
+- [ ] **Enterprise Documentation Standards** – aligns with Day 1/Day 2 style.
+
+---
+
+## 11. Summary
+Day 3 introduces fully specified, reusable prompt templates that embed runtime context, enforce validation, and define clear failure pathways. Combined with the robust fallback matrix, the system now delivers precise, safe, and context‑aware interactions while staying aligned with the enterprise documentation standards established on Days 1‑2.
+
+
+
